@@ -84,6 +84,7 @@ You can now skip to [Test SSH Access](#test-ssh-access) and SSH into your RPi2.
 * Get and connect a console cable (use [this guide](https://learn.adafruit.com/downloads/pdf/adafruits-raspberry-pi-lesson-5-using-a-console-cable.pdf)),
 * Temporarily connect RPi to a router with an Ethernet cable and SSH in (see below), or
 * Connect the RPi directly to your computer with an Ethernet cable (using [this guide](http://www.interlockroc.org/2012/12/06/raspberry-pi-macgyver/)) and SSH in (see below)
+* As of 12/11/2016 the Raspberry Pi Foundation is disabling SSH by default in Raspbian as a security precaution. To enable SSH, create a file called ssh and save it to the boot directory of the mounted drive.  The file can be blank, and it has no extensions. This will tell your Pi to enable SSH. 
 
 #### Configure WiFi Settings
 
@@ -102,6 +103,8 @@ Input your home wifi next: `wpa_passphrase "<my_SSID_home>" "<my_home_network_pa
 You will also want to edit `/etc/network/interfaces` to change the following line from `iface wlan0 inet manual` to `iface wlan0 inet dhcp`
 
 To accomplish this input `sudo nano /etc/network/interfaces` and change `manual` to `dhcp` on the line that has `iface wlan0 inet`
+
+The `dhcp` tells the ifup process to configure the interface to expect some type of dhcp server on the other end, and use that to configure the IP/Netmask, Gateway, and DNS addresses on your Pi. The `manual` indicates to the ifup process that that interface is not to be configured at all. For further reading on the `interfaces` and `wpa_supplicant.conf` files, type `man 5 interfaces` or `man 5 wpa_supplicant` when logged into your Pi.
 
 If you are not familiar with nano (the text editor) you may want to check out [this tutorial](http://www.howtogeek.com/howto/42980/the-beginners-guide-to-nano-the-linux-command-line-text-editor/)
 
@@ -246,13 +249,11 @@ Install the watchdog package, which controls the conditions under which the hard
 `sudo apt-get install watchdog`
 
 `sudo modprobe bcm2708_wdog` - If this command does not work, it appears to be ok to skip it.
-
+	
 `sudo bash -c 'echo "bcm2708_wdog" >> /etc/modules'`
 
-Next, add watchdog to startup applications:
-
-`sudo update-rc.d watchdog defaults`
-
+**Note:** On the RPi3, the kernel module is bcm2835_wdt and is loaded by default in Raspbian Jessie.
+		
 Edit the config file by opening up nano text editor
 
 `sudo nano /etc/watchdog.conf`
@@ -264,10 +265,28 @@ max-load-1              = 24
 watchdog-device         = /dev/watchdog
 ```
 
+Next, add watchdog to startup applications:
+
+`sudo update-rc.d watchdog defaults`
+
 Finally, start watchdog by entering:
 
 `sudo service watchdog start`
 
+**Note:** The init system which handles processes going forward in most Linux systems is systemd. Rc.d may be depreciated in the future, so it may be best to use systemd here. Unfortunately, the watchdog package in Raspbian Jessie(as of 12/10/2016) does not properly handle the systemd unit file. To fix it, do the following:
+		
+`echo "WantedBy=multi-user.target" | sudo tee --append /lib/systemd/system/watchdog.service > /dev/null`
+		
+this should place it in the service file under the [Install] heading.
+		
+and then to enable it to start at each boot:
+		
+`sudo systemctl enable watchdog`
+
+To start process without rebooting:
+
+`sudo systemctl start watchdog`
+ 
 ## Update the Raspberry Pi [optional]
 
 Update the RPi2.
@@ -372,3 +391,8 @@ Open your crontab for editing -
 Save the file, then restart -
 
 `sudo shutdown -r now`
+
+or
+
+`sudo systemctl reboot`
+
